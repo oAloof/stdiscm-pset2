@@ -1,0 +1,28 @@
+# Build artifacts
+/build/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+
+# Executables
+pset2
+*.out
+*.o
+*.obj
+*.exe
+
+# VS Code settings
+.vscode/
+*.code-workspace
+
+# macOS system files
+.DS_Store
+
+# Logs and temp files
+*.log
+*.tmp
+
+# clangd / cpptools caches
+.cache/
+.clangd/

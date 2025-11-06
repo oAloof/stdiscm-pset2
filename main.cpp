@@ -159,6 +159,13 @@ auto main(int argc, char *argv[]) -> int
         return 1;
     }
 
+    // Validate all parameters are non-negative
+    if (g_instances < 1 || g_tanks < 0 || g_healers < 0 || g_dps < 0)
+    {
+        std::cerr << "Error: Instances must be >= 1 and players must be >= 0\n";
+        return 1;
+    }
+
     // Validate dungeon time range
     if (g_t1 < 1 || g_t2 < 1 || g_t1 > g_t2)
     {

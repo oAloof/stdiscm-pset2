@@ -45,7 +45,7 @@ std::vector<Instance> instances;
 std::mutex state_mutex;
 std::mutex print_mutex;
 
-void print_status_snapshot()
+void print_event_with_status(int instance_id, const std::string &event)
 {
     std::string snapshot;
     {
@@ -53,12 +53,12 @@ void print_status_snapshot()
         snapshot = "[Status] ";
         for (int i = 0; i < g_instances; ++i)
         {
-            snapshot += "I" + std::to_string(i) + ":" + status_to_string(instances[i].status);
-            if (i + 1 < g_instances)
-                snapshot += ' ';
+            std::string inst_str = "I" + std::to_string(i) + ":" + status_to_string(instances[i].status);
+            snapshot += pad(inst_str, 12);
         }
     }
     std::scoped_lock print_lock(print_mutex);
+    std::cout << "[I" << instance_id << "] " << event << '\n';
     std::cout << snapshot << '\n';
 }
 
@@ -90,12 +90,13 @@ void instance_loop(int instance_id)
             }
         }
 
-        print_status_snapshot();
-
         if (should_exit)
         {
+            print_event_with_status(instance_id, "No more players available");
             break; // Exit if no more parties can be formed
         }
+
+        print_event_with_status(instance_id, "Party formed");
 
         // Simulate dungeon run
         int duration = random_int(g_t1, g_t2);
@@ -109,7 +110,7 @@ void instance_loop(int instance_id)
             instances[instance_id].status = InstanceStatus::Empty;
         }
 
-        print_status_snapshot();
+        print_event_with_status(instance_id, "Dungeon completed (" + std::to_string(duration) + "s)");
     }
 }
 
@@ -167,6 +168,51 @@ auto main(int argc, char *argv[]) -> int
 
     // Initialize dungeon instances
     instances.assign(g_instances, Instance{});
+
+    {
+        std::scoped_lock print_lock(print_mutex);
+        std::cout << "=== Starting LFG Simulation ===\n"
+                  << pad("Instances:", 15) << g_instances << "\n"
+                  << pad("Players:", 15) << "Tanks = " << g_tanks
+                  << ", Healers = " << g_healers
+                  << ", DPS = " << g_dps << "\n"
+                  << pad("Clear time:", 15) << "[" << g_t1 << "," << g_t2 << "] seconds\n"
+                  << "================================\n\n";
+    }
+
+    // Launch instance threads
+    std::vector<std::thread> instance_workers;
+    instance_workers.reserve(g_instances);
+    for (int i = 0; i < g_instances; ++i)
+    {
+        instance_workers.emplace_back(instance_loop, i);
+    }
+
+    // Wait for all instance threads to complete
+    for (auto &worker : instance_workers)
+    {
+        worker.join();
+    }
+
+    // Final summary
+    int total_served = 0, total_time = 0;
+    std::cout << "\n=== Simulation Summary ===\n";
+    for (int i = 0; i < g_instances; ++i)
+    {
+        const Instance &inst = instances[i];
+        std::cout << "Instance " << i << ": Served " << inst.served
+                  << " parties, Total time " << inst.total_time << " seconds\n";
+        total_served += inst.served;
+        total_time += inst.total_time;
+    }
+    std::cout << "--------------------------\n"
+              << "Total parties served: " << total_served << "\n"
+              << "Total time spent: " << total_time << " seconds\n"
+              << "\nRemaining players:\n"
+              << "  Tanks: " << g_tanks << "\n"
+              << "  Healers: " << g_healers << "\n"
+              << "  DPS: " << g_dps << "\n"
+              << "==========================\n";
 
     return 0;
 }

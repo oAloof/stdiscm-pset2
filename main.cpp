@@ -45,23 +45,6 @@ std::vector<Instance> instances;
 std::mutex state_mutex;
 std::mutex print_mutex;
 
-void print_event_with_status(int instance_id, const std::string &event)
-{
-    std::string snapshot;
-    {
-        std::scoped_lock lock(state_mutex);
-        snapshot = "[Status] ";
-        for (int i = 0; i < g_instances; ++i)
-        {
-            std::string inst_str = "I" + std::to_string(i) + ":" + status_to_string(instances[i].status);
-            snapshot += pad(inst_str, 12);
-        }
-    }
-    std::scoped_lock print_lock(print_mutex);
-    std::cout << "[I" << instance_id << "] " << event << '\n';
-    std::cout << snapshot << '\n';
-}
-
 auto can_form_party() -> bool
 {
     return (g_tanks >= 1 && g_healers >= 1 && g_dps >= 3);
@@ -73,6 +56,7 @@ void instance_loop(int instance_id)
     {
         // Try to form a party
         bool should_exit = false;
+        std::string status_snapshot;
         {
             std::scoped_lock lock(state_mutex);
             if (!can_form_party())
@@ -88,29 +72,61 @@ void instance_loop(int instance_id)
                 g_dps -= 3;
                 instances[instance_id].status = InstanceStatus::Active;
             }
+
+            // Capture status snapshot while still holding the lock
+            status_snapshot = "[Status] ";
+            for (int i = 0; i < g_instances; ++i)
+            {
+                std::string inst_str = "I" + std::to_string(i) + ":" + status_to_string(instances[i].status);
+                status_snapshot += pad(inst_str, 12);
+            }
+        }
+
+        // Print atomically
+        {
+            std::scoped_lock print_lock(print_mutex);
+            if (should_exit)
+            {
+                std::cout << "[I" << instance_id << "] No more players available\n";
+            }
+            else
+            {
+                std::cout << "[I" << instance_id << "] Party formed\n";
+            }
+            std::cout << status_snapshot << '\n';
         }
 
         if (should_exit)
         {
-            print_event_with_status(instance_id, "No more players available");
             break; // Exit if no more parties can be formed
         }
-
-        print_event_with_status(instance_id, "Party formed");
 
         // Simulate dungeon run
         int duration = random_int(g_t1, g_t2);
         std::this_thread::sleep_for(std::chrono::seconds(duration));
 
-        // Update instance stats
+        // Update instance stats and capture snapshot
         {
             std::scoped_lock lock(state_mutex);
             instances[instance_id].served += 1;
             instances[instance_id].total_time += duration;
             instances[instance_id].status = InstanceStatus::Empty;
+
+            // Capture status snapshot while still holding the lock
+            status_snapshot = "[Status] ";
+            for (int i = 0; i < g_instances; ++i)
+            {
+                std::string inst_str = "I" + std::to_string(i) + ":" + status_to_string(instances[i].status);
+                status_snapshot += pad(inst_str, 12);
+            }
         }
 
-        print_event_with_status(instance_id, "Dungeon completed (" + std::to_string(duration) + "s)");
+        // Print atomically
+        {
+            std::scoped_lock print_lock(print_mutex);
+            std::cout << "[I" << instance_id << "] Dungeon completed (" << duration << "s)\n";
+            std::cout << status_snapshot << '\n';
+        }
     }
 }
 

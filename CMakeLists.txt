@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Main executable
 add_executable(pset2
     main.cpp
+    utils.cpp
 )
 
 # cmake --build build

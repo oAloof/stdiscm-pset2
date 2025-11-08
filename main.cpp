@@ -31,8 +31,8 @@ auto status_to_string(InstanceStatus status) -> std::string
 struct Instance
 {
     InstanceStatus status = InstanceStatus::Empty;
-    int served = 0;     // number of parties served
-    int total_time = 0; // total time served
+    int served = 0;          // number of parties served
+    long long total_time = 0; // total time served
 };
 
 // Global simulation parameters
@@ -166,6 +166,20 @@ auto main(int argc, char *argv[]) -> int
         return 1;
     }
 
+    constexpr int MAX_INSTANCES = 100;
+    if (g_instances > MAX_INSTANCES)
+    {
+        std::cerr << "Error: Too many instances (max: " << MAX_INSTANCES << ")\n";
+        return 1;
+    }
+
+    constexpr int MAX_PLAYERS = 10000;
+    if (g_tanks > MAX_PLAYERS || g_healers > MAX_PLAYERS || g_dps > MAX_PLAYERS)
+    {
+        std::cerr << "Error: Player count exceeds maximum (" << MAX_PLAYERS << ")\n";
+        return 1;
+    }
+
     // Validate dungeon time range
     if (g_t1 < 1 || g_t2 < 1 || g_t1 > g_t2)
     {
@@ -191,6 +205,11 @@ auto main(int argc, char *argv[]) -> int
 
     // Initialize dungeon instances
     instances.assign(g_instances, Instance{});
+
+    if (!can_form_party())
+    {
+        std::cout << "Warning: Not enough players to form even one party (need 1 Tank, 1 Healer, 3 DPS)\n";
+    }
 
     {
         std::scoped_lock print_lock(print_mutex);
@@ -218,7 +237,8 @@ auto main(int argc, char *argv[]) -> int
     }
 
     // Final summary
-    int total_served = 0, total_time = 0;
+    int total_served = 0;
+    long long total_time = 0;
     std::cout << "\n=== Simulation Summary ===\n";
     for (int i = 0; i < g_instances; ++i)
     {
